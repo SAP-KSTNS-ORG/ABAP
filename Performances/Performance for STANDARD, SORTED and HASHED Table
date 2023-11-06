@@ -1,0 +1,73 @@
+1. Standard Table
+
+DATA: GT_STD    TYPE STANDARD TABLE OF T100,
+      GT_SORTED TYPE SORTED TABLE OF T100 WITH UNIQUE KEY SPRSL ARBGB MSGNR,
+      GT_HASHED TYPE HASHED TABLE OF T100 WITH UNIQUE KEY SPRSL ARBGB MSGNR.
+DATA: LV_STA_TIME TYPE TIMESTAMPL,
+      LV_END_TIME TYPE TIMESTAMPL,
+      LV_DIFF     TYPE TIMESTAMPL.
+SELECT * FROM T002 INTO TABLE @DATA(GT_T002).
+
+SELECT * FROM T100 INTO TABLE GT_STD UP TO 1000000 ROWS.
+GT_SORTED = GT_STD.
+GT_HASHED = GT_STD.
+
+GET TIME STAMP FIELD LV_STA_TIME.
+LOOP AT GT_T002 INTO DATA(GS_T002).
+  READ TABLE GT_STD TRANSPORTING NO FIELDS
+    WITH KEY SPRSL = GS_T002-SPRAS.
+ENDLOOP.
+GET TIME STAMP FIELD LV_END_TIME.
+CLEAR: GS_T002.
+LV_DIFF  = LV_END_TIME - LV_STA_TIME.
+WRITE: /(40) 'Read standard table: ', LV_DIFF.
+
+2. Standard table with binary search
+
+SORT GT_STD BY SPRSL ARBGB MSGNR.
+GET TIME STAMP FIELD LV_STA_TIME.
+LOOP AT GT_T002 INTO GS_T002.
+  READ TABLE GT_STD TRANSPORTING NO FIELDS
+    WITH KEY SPRSL = GS_T002-SPRAS ARBGB = 'JBNTK' MSGNR = '001' BINARY SEARCH.
+ENDLOOP.
+GET TIME STAMP FIELD LV_END_TIME.
+LV_DIFF  = LV_END_TIME - LV_STA_TIME.
+WRITE: /(40) 'Read standard table with binary search: ', LV_DIFF.
+
+3. Sorted table
+
+GET TIME STAMP FIELD LV_STA_TIME.
+LOOP AT GT_T002 INTO GS_T002.
+  READ TABLE GT_SORTED TRANSPORTING NO FIELDS
+    WITH KEY SPRSL = GS_T002-SPRAS ARBGB = 'JBNTK' MSGNR = '001'.
+ENDLOOP.
+GET TIME STAMP FIELD LV_END_TIME.
+LV_DIFF  = LV_END_TIME - LV_STA_TIME.
+WRITE: /(40) 'Read sorted table: ', LV_DIFF.
+
+4. Hashed table
+
+GET TIME STAMP FIELD LV_STA_TIME.
+LOOP AT GT_T002 INTO GS_T002.
+    READ TABLE GT_HASHED TRANSPORTING NO FIELDS
+    WITH KEY SPRSL = GS_T002-SPRAS ARBGB = 'JBNTK' MSGNR = '001'.
+ENDLOOP.
+GET TIME STAMP FIELD LV_END_TIME.
+LV_DIFF  = LV_END_TIME - LV_STA_TIME.
+WRITE: /(40) 'Read hashed table: ', LV_DIFF.
+
+5. Output
+
+https://www.notion.so/Performance-for-STANDARD-SORTED-and-HASHED-Table-ba9936fa9230404a9dca57bf0ee9bff7?pvs=4#b816321bfc0b4502acbf89a4e57d1990
+
+6. Đánh giá
+    6.1. Performance
+    - Standard Table là loại bảng được sử dụng rộng rãi nhất. Nó có nhược điểm về hiệu suất nếu không được sử dụng đúng cách.
+    - Kết quả cho thấy nếu chỉ read standard table mà không binary search thì hiệu suất rất kém, ví dụ phía trên read 1 triệu records thời gian thực hiện của read standard table sử dụng binary search nhanh hơn nhiều so với read standard table thông thường
+    - Thời gian thực hiện của read standard table sử dụng binary search và read sorted table nhìn chung là ngang nhau
+    - Kết quả trên ta thấy read hashed table nhanh nhất, gấp 3 lần sorted table và table sử dụng binary search và nó không thể truy cập bằng index nhưng nếu hashed table không read đủ key thì hiệu suất nó cực kì chậm như ví dụ phía dưới.
+
+    6.2. Mức độ khả thi khi sử dụng
+    - Thời gian thực thi của hashed table nhanh hơn nhiều so với các table còn lại nhưng độ phức tạp cao và phù hợp khi tra cứu thông tin cố định từ các khóa.
+    - Bản chất của table khi sử dụng binary search và sorted table là như nhau vì binary search trên SORTED TABLE được sử dụng theo mặc định cho READ TABLE. Mặc dù có thể sử dụng binary search cho sorted table nhưng việc sử dụng nó là dư thừa.
+    - ⇒ Nên sử dụng sorted table khi cần duyệt và tìm kiếm dữ liệu theo một thứ tự cụ thể của key, sử dụng hashed table phù hợp cho việc tìm kiếm 1 thông tin cụ thể dựa trên các key.
